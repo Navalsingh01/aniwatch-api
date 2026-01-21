@@ -10,7 +10,6 @@
         "build": "tsc",
         "buildnstart": "tsc && node dist/src/server.js",
         "vercel-build": "echo hello",
-        "prepare": "node .husky/install.mjs",
         "test": "vitest run --config vitest.config.ts",
         "healthcheck": "curl -f http://localhost:4000/health",
         "typecheck": "tsc --noEmit",
