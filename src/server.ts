@@ -18,7 +18,6 @@ import { cacheConfigSetter, cacheControl } from "./middleware/cache.js";
 
 import pkgJson from "../package.json" with { type: "json" };
 
-//
 const BASE_PATH = "/api/v2" as const;
 
 const app = new Hono<ServerContext>();
@@ -27,61 +26,44 @@ app.use(logging);
 app.use(corsConfig);
 app.use(cacheControl);
 
-/*
-    CAUTION: 
-    Having the "ANIWATCH_API_HOSTNAME" env will
-    enable rate limitting for the deployment.
-    WARNING:
-    If you are using any serverless environment, you must set the
-    "ANIWATCH_API_DEPLOYMENT_ENV" to that environment's name, 
-    otherwise you may face issues.
-*/
 const isPersonalDeployment = Boolean(env.ANIWATCH_API_HOSTNAME);
 if (isPersonalDeployment) {
     app.use(ratelimit);
 }
 
-// if (env.ANIWATCH_API_DEPLOYMENT_ENV === DeploymentEnv.NODEJS) {
 app.use("/", serveStatic({ root: "public" }));
-// }
 
 app.get("/health", (c) => c.text("daijoubu", { status: 200 }));
+
 app.get("/v", async (c) =>
     c.text(
-        `aniwatch-api: v${"version" in pkgJson && pkgJson?.version ? pkgJson.version : "-1"}\n` +
-            `aniwatch-package: v${"dependencies" in pkgJson && pkgJson?.dependencies?.aniwatch ? pkgJson?.dependencies?.aniwatch : "-1"}`
+        `aniwatch-api: v${pkgJson?.version ?? "-1"}\n` +
+            `aniwatch-package: v${pkgJson?.dependencies?.aniwatch ?? "-1"}`
     )
 );
 
 app.use(cacheConfigSetter(BASE_PATH.length));
-
 app.basePath(BASE_PATH).route("/hianime", hianimeRouter);
-app.basePath(BASE_PATH).get("/anicrush", (c) =>
-    c.text("Anicrush could be implemented in future.")
-);
 
 app.notFound(notFoundHandler);
 app.onError(errorHandler);
 
-//
 (function () {
-    /*
-        NOTE:
-        "ANIWATCH_API_DEPLOYMENT_MODE" env must be set to
-        its supported name for serverless deployments
-        Eg: "vercel" for vercel deployments
-    */
     if (SERVERLESS_ENVIRONMENTS.includes(env.ANIWATCH_API_DEPLOYMENT_ENV)) {
         return;
     }
 
+    // 🔥 FIXED PORT LOGIC (THIS IS THE IMPORTANT PART)
+    const PORT =
+        Number(process.env.PORT) ||
+        Number(env.ANIWATCH_API_PORT) ||
+        4000;
+
     const server = serve({
-        port: env.ANIWATCH_API_PORT,
+        port: PORT,
         fetch: app.fetch,
     }).addListener("listening", () =>
-        log.info(
-            `aniwatch-api RUNNING at http://localhost:${env.ANIWATCH_API_PORT}`
-        )
+        log.info(`aniwatch-api RUNNING on port ${PORT}`)
     );
 
     process.on("SIGINT", () => execGracefulShutdown(server));
@@ -92,41 +74,30 @@ app.onError(errorHandler);
     });
     process.on("unhandledRejection", (reason, promise) => {
         log.error(
-            `Unhandled Rejection at: ${promise}, reason: ${reason instanceof Error ? reason.message : reason}`
+            `Unhandled Rejection at: ${promise}, reason: ${
+                reason instanceof Error ? reason.message : reason
+            }`
         );
         execGracefulShutdown(server);
     });
 
-    /*
-        CAUTION:
-        The `if` below block is for `render free deployments` only,
-        as their free tier has an approx 10 or 15 minute sleep time.
-        This is to keep the server awake and prevent it from sleeping.
-        You can enable the automatic health check by setting the
-        environment variables "ANIWATCH_API_HOSTNAME" to your deployment's hostname,
-        and "ANIWATCH_API_DEPLOYMENT_ENV" to "render" in your environment variables.
-        If you are not using render, you can remove the below `if` block.
-    */
     if (
         isPersonalDeployment &&
         env.ANIWATCH_API_DEPLOYMENT_ENV === DeploymentEnv.RENDER
     ) {
-        const INTERVAL_DELAY = 8 * 60 * 1000; // 8mins
+        const INTERVAL_DELAY = 8 * 60 * 1000;
         const url = new URL(`https://${env.ANIWATCH_API_HOSTNAME}/health`);
 
-        // don't sleep
         setInterval(() => {
             https
                 .get(url.href)
-                .on("response", () => {
+                .on("response", () =>
                     log.info(
-                        `aniwatch-api HEALTH_CHECK at ${new Date().toISOString()}`
-                    );
-                })
-                .on("error", (err) =>
-                    log.warn(
-                        `aniwatch-api HEALTH_CHECK failed; ${err.message.trim()}`
+                        `aniwatch-api HEALTH_CHECK ${new Date().toISOString()}`
                     )
+                )
+                .on("error", (err) =>
+                    log.warn(`HEALTH_CHECK failed; ${err.message}`)
                 );
         }, INTERVAL_DELAY);
     }
