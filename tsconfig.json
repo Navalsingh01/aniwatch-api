@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "ES2023",
+    "verbatimModuleSyntax": true,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+
+    "strict": true,
+
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext",
+
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    "outDir": "./dist",
+    "rootDir": "./src",
+
+    "sourceMap": true,
+    "declaration": true,
+    "removeComments": true,
+
+    "forceConsistentCasingInFileNames": true,
+    "strictFunctionTypes": true,
+
+    "lib": ["ES2023"]
+  },
+  "include": ["src"],
+  "exclude": ["node_modules"]
+}
